@@ -7,47 +7,52 @@
   # Import napalm
   inputs.napalm.url = "github:nix-community/napalm";
 
-  outputs = { self, nixpkgs, napalm }:
-    let
-      # Generate a user-friendly version number.
-      version = builtins.substring 0 8 self.lastModifiedDate;
+  inputs.planka.url = "github:plankanban/planka";
+  inputs.planka.flake = false;
 
-      # System types to support.
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" "i686-linux" "x86_64-darwin" "aarch64-darwin" ];
+  outputs = {
+    self,
+    nixpkgs,
+    planka,
+    napalm,
+  } @ inputs: let
+    # Generate a user-friendly version number.
+    version = builtins.substring 0 8 self.lastModifiedDate;
 
-      # Helper function to generate an attrset '{ x86_64-linux = f "x86_64-linux"; ... }'.
-      forAllSystems = f:
-        nixpkgs.lib.genAttrs supportedSystems (system: f system);
+    # System types to support.
+    supportedSystems = ["x86_64-linux" "aarch64-linux" "i686-linux" "x86_64-darwin" "aarch64-darwin"];
 
-      # Nixpkgs instantiated for supported system types.
-      nixpkgsFor = forAllSystems (system:
-        import nixpkgs {
-          inherit system;
-          # Add napalm to you overlay's list
-          overlays = [
-            self.overlays.default
-            napalm.overlays.default
-          ];
-        });
+    # Helper function to generate an attrset '{ x86_64-linux = f "x86_64-linux"; ... }'.
+    forAllSystems = f:
+      nixpkgs.lib.genAttrs supportedSystems (system: f system);
 
-    in
-    {
-      # A Nixpkgs overlay.
-      overlays = {
-        default = final: prev: {
-          # Example package
-          planka = final.napalm.buildPackage ./planka { };
-        };
-      };
-
-      # Provide your packages for selected system types.
-      packages = forAllSystems (system: {
-        inherit (nixpkgsFor.${system}) planka;
-
-        # The default package for 'nix build'. This makes sense if the
-        # flake provides only one package or there is a clear "main"
-        # package.
-        default = self.packages.${system}.planka;
+    # Nixpkgs instantiated for supported system types.
+    nixpkgsFor = forAllSystems (system:
+      import nixpkgs {
+        inherit system;
+        # Add napalm to you overlay's list
+        overlays = [
+          self.overlays.default
+          napalm.overlays.default
+        ];
       });
+  in {
+    # A Nixpkgs overlay.
+    overlays = {
+      default = final: prev: {
+        # Example package
+        plankaServer = final.napalm.buildPackage (inputs.planka + "/server") {};
+      };
     };
+
+    # Provide your packages for selected system types.
+    packages = forAllSystems (system: {
+      inherit (nixpkgsFor.${system}) plankaServer;
+
+      # The default package for 'nix build'. This makes sense if the
+      # flake provides only one package or there is a clear "main"
+      # package.
+      default = self.packages.${system}.plankaServer;
+    });
+  };
 }
